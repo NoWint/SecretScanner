@@ -141,7 +141,7 @@ rules:
 |------|---------|---------|
 | 历史全量扫描 | `secretscanner scan <path>` | 所有 commit 的 diff |
 | 工作区扫描 | `secretscanner scan <path> --no-history` | 仅当前工作区文件 |
-| Pre-commit 扫描 | hook 自动触发 | 仅暂存区文件（`git diff --cached`） |
+| Pre-commit 扫描 | hook 自动触发 | 仅暂存区文件（通过 go-git staging area API 获取） |
 
 ## Pre-commit Hook
 
@@ -153,7 +153,7 @@ rules:
 4. 设置可执行权限
 
 Hook 行为：
-- `--staged` 标志：仅扫描暂存区文件
+- `--staged` 标志：仅扫描暂存区文件（通过 go-git staging area API 获取文件列表）
 - 发现泄露：输出结果，退出码 1，阻止提交
 - 未发现泄露：静默通过，退出码 0
 
