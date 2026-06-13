@@ -16,12 +16,10 @@ type Finding struct {
 	RuleName   string  // Name of the matched rule
 	FilePath   string  // File path where the secret was found
 	LineNumber int     // Line number
-	Column     int     // Column offset
 	Match      string  // The matched text
 	Severity   string  // Severity level from the rule
 	Entropy    float64 // Shannon entropy of the match
 	CommitHash string  // Git commit hash
-	CommitMsg  string  // Git commit message
+	CommitTime string  // Commit timestamp
 	Author     string  // Git author
-	Date       string  // Commit date
 }

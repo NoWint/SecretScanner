@@ -44,7 +44,7 @@ func FormatTable(findings []rules.Finding) string {
 		sb.WriteString(fmt.Sprintf("  File:   %s:%d\n", f.FilePath, f.LineNumber))
 		sb.WriteString(fmt.Sprintf("  Match:  %s\n", MaskSecret(f.Match)))
 		if f.CommitHash != "" {
-			sb.WriteString(fmt.Sprintf("  Commit: %s (%s)\n", f.CommitHash, f.Date))
+			sb.WriteString(fmt.Sprintf("  Commit: %s (%s)\n", f.CommitHash, f.CommitTime))
 		}
 		sb.WriteString(fmt.Sprintf("  Entropy: %.2f\n", f.Entropy))
 		sb.WriteString("\n")

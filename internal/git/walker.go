@@ -51,7 +51,7 @@ func ScanRepository(path string, ruleSet []rules.Rule) ([]rules.Finding, error) 
 				findings := scanner.ScanContent(content, f.Name, ruleSet)
 				for i := range findings {
 					findings[i].CommitHash = c.Hash.String()[:7]
-					findings[i].Date = c.Author.When.Format("2006-01-02")
+					findings[i].CommitTime = c.Author.When.Format("2006-01-02")
 					findings[i].Author = c.Author.Email
 				}
 				allFindings = append(allFindings, findings...)
@@ -95,7 +95,7 @@ func ScanRepository(path string, ruleSet []rules.Rule) ([]rules.Finding, error) 
 			findings := scanner.ScanContent(content, filePath, ruleSet)
 			for i := range findings {
 				findings[i].CommitHash = c.Hash.String()[:7]
-				findings[i].Date = c.Author.When.Format("2006-01-02")
+				findings[i].CommitTime = c.Author.When.Format("2006-01-02")
 				findings[i].Author = c.Author.Email
 			}
 			allFindings = append(allFindings, findings...)
