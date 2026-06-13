@@ -13,8 +13,31 @@ import (
 	"github.com/NoWint/SecretScanner/internal/scanner"
 )
 
+// dedupKey creates a unique key for a finding to deduplicate across commits.
+func dedupKey(f rules.Finding) string {
+	return f.RuleID + ":" + f.FilePath + ":" + f.Match
+}
+
+// appendDedup adds findings, skipping duplicates based on (ruleID, filePath, match).
+func appendDedup(allFindings []rules.Finding, findings []rules.Finding, dedup map[string]bool) []rules.Finding {
+	for _, f := range findings {
+		key := dedupKey(f)
+		if dedup[key] {
+			continue
+		}
+		dedup[key] = true
+		allFindings = append(allFindings, f)
+	}
+	return allFindings
+}
+
+// ProgressFunc is called periodically during scanning to report progress.
+// scanned is the number of commits scanned so far.
+type ProgressFunc func(scanned int)
+
 // ScanRepository scans all commits in a git repository for secrets.
-func ScanRepository(path string, ruleSet []rules.Rule) ([]rules.Finding, error) {
+// If progress is not nil, it is called after each commit is processed.
+func ScanRepository(path string, ruleSet []rules.Rule, progress ProgressFunc) ([]rules.Finding, error) {
 	repo, err := git.PlainOpen(path)
 	if err != nil {
 		return nil, fmt.Errorf("opening repository at %s: %w", path, err)
@@ -32,7 +55,10 @@ func ScanRepository(path string, ruleSet []rules.Rule) ([]rules.Finding, error) 
 	defer commitIter.Close()
 
 	seen := make(map[string]bool)
+	// Deduplicate findings: same (ruleID, filePath, match) only reported once
+	dedup := make(map[string]bool)
 	var allFindings []rules.Finding
+	scanned := 0
 
 	err = commitIter.ForEach(func(c *object.Commit) error {
 		if c.NumParents() == 0 {
@@ -55,7 +81,7 @@ func ScanRepository(path string, ruleSet []rules.Rule) ([]rules.Finding, error) 
 					findings[i].CommitTime = c.Author.When.Format("2006-01-02")
 					findings[i].Author = c.Author.Email
 				}
-				allFindings = append(allFindings, findings...)
+				allFindings = appendDedup(allFindings, findings, dedup)
 				return nil
 			})
 			return nil
@@ -101,8 +127,12 @@ func ScanRepository(path string, ruleSet []rules.Rule) ([]rules.Finding, error) 
 					findings[i].CommitTime = c.Author.When.Format("2006-01-02")
 					findings[i].Author = c.Author.Email
 				}
-				allFindings = append(allFindings, findings...)
+				allFindings = appendDedup(allFindings, findings, dedup)
 			}
+		}
+		scanned++
+		if progress != nil {
+			progress(scanned)
 		}
 		return nil
 	})
@@ -115,7 +145,7 @@ func ScanRepository(path string, ruleSet []rules.Rule) ([]rules.Finding, error) 
 }
 
 // ScanWorkingDirectory scans only the current working directory files.
-func ScanWorkingDirectory(path string, ruleSet []rules.Rule) ([]rules.Finding, error) {
+func ScanWorkingDirectory(path string, ruleSet []rules.Rule, _ ProgressFunc) ([]rules.Finding, error) {
 	repo, err := git.PlainOpen(path)
 	if err != nil {
 		return nil, fmt.Errorf("opening repository at %s: %w", path, err)
@@ -155,7 +185,7 @@ func ScanWorkingDirectory(path string, ruleSet []rules.Rule) ([]rules.Finding, e
 }
 
 // ScanStagedFiles scans only the files in the staging area.
-func ScanStagedFiles(path string, ruleSet []rules.Rule) ([]rules.Finding, error) {
+func ScanStagedFiles(path string, ruleSet []rules.Rule, _ ProgressFunc) ([]rules.Finding, error) {
 	repo, err := git.PlainOpen(path)
 	if err != nil {
 		return nil, fmt.Errorf("opening repository at %s: %w", path, err)

@@ -4,9 +4,41 @@ import (
 	"bufio"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/NoWint/SecretScanner/internal/rules"
 )
+
+// binaryThreshold is the ratio of non-printable characters above which content
+// is considered binary. Based on Git's heuristic (0.30).
+const binaryThreshold = 0.30
+
+// IsBinary checks if content appears to be binary data.
+// Uses the same heuristic as Git: if more than 30% of the first 8KB
+// contains non-printable characters (excluding common text chars), it's binary.
+func IsBinary(content string) bool {
+	sample := content
+	if len(sample) > 8192 {
+		sample = sample[:8192]
+	}
+	if len(sample) == 0 {
+		return false
+	}
+
+	nonPrintable := 0
+	for _, b := range []byte(sample) {
+		if b < 0x20 && b != 0x09 && b != 0x0A && b != 0x0D {
+			nonPrintable++
+		}
+	}
+
+	// Also check if it's valid UTF-8
+	if !utf8.ValidString(sample) {
+		return true
+	}
+
+	return float64(nonPrintable)/float64(len(sample)) > binaryThreshold
+}
 
 // compiledRule is a rule with its regex pre-compiled for performance.
 type compiledRule struct {
@@ -15,7 +47,12 @@ type compiledRule struct {
 }
 
 // ScanContent scans text content against a set of rules and returns findings.
+// Returns nil if content appears to be binary.
 func ScanContent(content string, filePath string, ruleSet []rules.Rule) []rules.Finding {
+	if IsBinary(content) {
+		return nil
+	}
+
 	var findings []rules.Finding
 
 	// Pre-compile regexes once per rule, not per line

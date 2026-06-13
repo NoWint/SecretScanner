@@ -21,7 +21,7 @@ func TestScanRepositoryOnRealGitRepo(t *testing.T) {
 			Severity:   "high",
 			Keywords:   []string{"AKIA"},
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("ScanRepository returned error: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestScanRepositoryOnRealGitRepo(t *testing.T) {
 }
 
 func TestScanRepositoryInvalidPath(t *testing.T) {
-	_, err := ScanRepository("/nonexistent/path", nil)
+	_, err := ScanRepository("/nonexistent/path", nil, nil)
 	if err == nil {
 		t.Error("expected error for invalid path")
 	}

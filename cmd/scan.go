@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/NoWint/SecretScanner/internal/config"
 	"github.com/NoWint/SecretScanner/internal/git"
 	"github.com/NoWint/SecretScanner/internal/ignore"
 	"github.com/NoWint/SecretScanner/internal/report"
@@ -17,6 +18,7 @@ var (
 	scanRules     string
 	scanNoHistory bool
 	scanStaged    bool
+	scanQuiet     bool
 )
 
 var scanCmd = &cobra.Command{
@@ -28,6 +30,17 @@ var scanCmd = &cobra.Command{
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
+		}
+
+		// Load config file if exists
+		cfg := config.Load(path)
+
+		// Apply config defaults (CLI flags override config)
+		if !cmd.Flags().Changed("format") && cfg.Format != "" {
+			scanFormat = cfg.Format
+		}
+		if !cmd.Flags().Changed("rules") && cfg.Rules != "" {
+			scanRules = cfg.Rules
 		}
 
 		// Load rules
@@ -47,16 +60,30 @@ var scanCmd = &cobra.Command{
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: error reading ignore file: %v\n", err)
 		}
+		// Merge config allowlist into ignore patterns
+		patterns = append(patterns, cfg.Ignore...)
 		matcher := ignore.NewMatcher(patterns)
+
+		// Progress callback
+		var progress git.ProgressFunc
+		if !scanQuiet && !scanStaged && !scanNoHistory {
+			progress = func(scanned int) {
+				fmt.Fprintf(os.Stderr, "\rScanning commits... %d", scanned)
+			}
+		}
 
 		// Scan
 		var findings []rules.Finding
 		if scanStaged {
-			findings, err = git.ScanStagedFiles(path, ruleSet)
+			findings, err = git.ScanStagedFiles(path, ruleSet, nil)
 		} else if scanNoHistory {
-			findings, err = git.ScanWorkingDirectory(path, ruleSet)
+			findings, err = git.ScanWorkingDirectory(path, ruleSet, nil)
 		} else {
-			findings, err = git.ScanRepository(path, ruleSet)
+			findings, err = git.ScanRepository(path, ruleSet, progress)
+		}
+
+		if progress != nil {
+			fmt.Fprintln(os.Stderr, "\rScanning commits... done!    ")
 		}
 
 		if err != nil {
@@ -97,4 +124,5 @@ func init() {
 	scanCmd.Flags().StringVarP(&scanRules, "rules", "r", "", "Path to custom rules YAML file")
 	scanCmd.Flags().BoolVar(&scanNoHistory, "no-history", false, "Scan only working directory, skip git history")
 	scanCmd.Flags().BoolVar(&scanStaged, "staged", false, "Scan only staged files (for pre-commit hook)")
+	scanCmd.Flags().BoolVarP(&scanQuiet, "quiet", "q", false, "Suppress progress output")
 }

@@ -31,7 +31,7 @@ func InstallHook(repoPath string) error {
 	hookContent := fmt.Sprintf(`#!/bin/sh
 # SecretScanner pre-commit hook
 # Scans staged files for secrets before allowing commit
-%s scan --staged --no-history --format=table
+%s scan --staged --no-history --format=table --quiet
 exit $?
 `, execPath)
 
