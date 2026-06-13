@@ -6,13 +6,6 @@ import (
 	"path/filepath"
 )
 
-const hookContent = `#!/bin/sh
-# SecretScanner pre-commit hook
-# Scans staged files for secrets before allowing commit
-secretscanner scan --staged --no-history --format=table
-exit $?
-`
-
 // InstallHook installs the pre-commit hook in the given git repository.
 func InstallHook(repoPath string) error {
 	hooksDir := filepath.Join(repoPath, ".git", "hooks")
@@ -24,6 +17,23 @@ func InstallHook(repoPath string) error {
 	if _, err := os.Stat(hookPath); err == nil {
 		return fmt.Errorf("pre-commit hook already exists at %s", hookPath)
 	}
+
+	// Resolve the absolute path of the secretscanner binary
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolving executable path: %w", err)
+	}
+	execPath, err = filepath.Abs(execPath)
+	if err != nil {
+		return fmt.Errorf("resolving absolute path: %w", err)
+	}
+
+	hookContent := fmt.Sprintf(`#!/bin/sh
+# SecretScanner pre-commit hook
+# Scans staged files for secrets before allowing commit
+%s scan --staged --no-history --format=table
+exit $?
+`, execPath)
 
 	if err := os.WriteFile(hookPath, []byte(hookContent), 0755); err != nil {
 		return fmt.Errorf("writing hook file: %w", err)

@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -34,6 +35,12 @@ func LoadRulesFromYAML(path string) ([]Rule, error) {
 
 	rules := make([]Rule, 0, len(yf.Rules))
 	for _, yr := range yf.Rules {
+		if yr.Pattern == "" {
+			return nil, fmt.Errorf("rule %s has empty pattern", yr.ID)
+		}
+		if _, err := regexp.Compile(yr.Pattern); err != nil {
+			return nil, fmt.Errorf("rule %s has invalid regex pattern %q: %w", yr.ID, yr.Pattern, err)
+		}
 		rules = append(rules, Rule{
 			ID:         yr.ID,
 			Name:       yr.Name,

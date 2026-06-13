@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -60,45 +61,48 @@ func ScanRepository(path string, ruleSet []rules.Rule) ([]rules.Finding, error) 
 			return nil
 		}
 
-		parent, err := c.Parent(0)
-		if err != nil {
-			return nil
-		}
-
-		patch, err := parent.Patch(c)
-		if err != nil {
-			return nil
-		}
-
-		for _, fp := range patch.FilePatches() {
-			from, to := fp.Files()
-			if to == nil {
+		// Diff against all parents to catch secrets from merged branches
+		for pIdx := 0; pIdx < c.NumParents(); pIdx++ {
+			parent, err := c.Parent(pIdx)
+			if err != nil {
 				continue
 			}
-			var filePath string
-			if from != nil {
-				filePath = from.Path()
-			} else {
-				filePath = to.Path()
+
+			patch, err := parent.Patch(c)
+			if err != nil {
+				continue
 			}
 
-			var content string
-			for _, chunk := range fp.Chunks() {
-				if chunk.Type() == diff.Add {
-					content += chunk.Content() + "\n"
+			for _, fp := range patch.FilePatches() {
+				from, to := fp.Files()
+				if to == nil {
+					continue
 				}
-			}
-			if content == "" {
-				continue
-			}
+				var filePath string
+				if from != nil {
+					filePath = from.Path()
+				} else {
+					filePath = to.Path()
+				}
 
-			findings := scanner.ScanContent(content, filePath, ruleSet)
-			for i := range findings {
-				findings[i].CommitHash = c.Hash.String()[:7]
-				findings[i].CommitTime = c.Author.When.Format("2006-01-02")
-				findings[i].Author = c.Author.Email
+				var content string
+				for _, chunk := range fp.Chunks() {
+					if chunk.Type() == diff.Add {
+						content += chunk.Content() + "\n"
+					}
+				}
+				if content == "" {
+					continue
+				}
+
+				findings := scanner.ScanContent(content, filePath, ruleSet)
+				for i := range findings {
+					findings[i].CommitHash = c.Hash.String()[:7]
+					findings[i].CommitTime = c.Author.When.Format("2006-01-02")
+					findings[i].Author = c.Author.Email
+				}
+				allFindings = append(allFindings, findings...)
 			}
-			allFindings = append(allFindings, findings...)
 		}
 		return nil
 	})
@@ -199,12 +203,13 @@ func ScanStagedFiles(path string, ruleSet []rules.Rule) ([]rules.Finding, error)
 			continue
 		}
 
-		buf := make([]byte, blob.Size)
-		n, _ := r.Read(buf)
+		content, err := io.ReadAll(r)
 		r.Close()
+		if err != nil {
+			continue
+		}
 
-		content := string(buf[:n])
-		findings := scanner.ScanContent(content, filePath, ruleSet)
+		findings := scanner.ScanContent(string(content), filePath, ruleSet)
 		allFindings = append(allFindings, findings...)
 	}
 

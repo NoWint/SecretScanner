@@ -43,19 +43,24 @@ func LoadIgnoreFile(path string) ([]string, error) {
 // Match returns true if the file path should be ignored.
 func (m *Matcher) Match(filePath string) bool {
 	for _, pattern := range m.patterns {
+		// Directory pattern (trailing /)
 		if strings.HasSuffix(pattern, "/") {
-			if strings.HasPrefix(filePath, pattern) || strings.HasPrefix(filePath, strings.TrimSuffix(pattern, "/")+"/") {
+			dirName := strings.TrimSuffix(pattern, "/")
+			// Match at any depth: docs/ matches both docs/ and src/docs/
+			if filePath == dirName || strings.HasPrefix(filePath, dirName+"/") || strings.Contains(filePath, "/"+dirName+"/") {
 				return true
 			}
 			continue
 		}
+		// Extension pattern (*.ext)
 		if strings.HasPrefix(pattern, "*.") {
-			ext := pattern[1:]
+			ext := pattern[1:] // *.lock -> .lock
 			if strings.HasSuffix(filePath, ext) {
 				return true
 			}
 			continue
 		}
+		// Exact match or glob
 		matched, _ := filepath.Match(pattern, filepath.Base(filePath))
 		if matched {
 			return true
