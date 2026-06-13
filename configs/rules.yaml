@@ -1,0 +1,10 @@
+# SecretScanner custom rules example
+# Add your own rules below
+rules:
+  - id: my-api-key
+    name: My Custom API Key
+    pattern: "my_api_key\\s*=\\s*['\"]([A-Za-z0-9]{32,})['\"]"
+    entropy_min: 3.5
+    severity: high
+    keywords:
+      - my_api_key
